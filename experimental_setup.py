@@ -16,20 +16,19 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def setup():
     #loading files
-    ds = retrieve_dataset(file="full")
+    # ds = retrieve_dataset(file="full")
     common = retrieve_dataset(file="common")
     #get unique pairs from the benchmark
-    unique_names = set(common["scientificName"])
-
+    unique_names = sorted(set(common["scientificName"]))
     #batch filtering to get the common subset
-    common_subset = ds.filter(
-        lambda x: [
-            name in unique_names 
-            for name in x['scientificName']
-        ],
-        batched=True,
-        batch_size=10000
-    )
+    # common_subset = ds.filter(
+    #     lambda x: [
+    #         name in unique_names 
+    #         for name in x['scientificName']
+    #     ],
+    #     batched=True,
+    #     batch_size=10000
+    # )
 
 
     # Load the model and preprocessors
@@ -54,7 +53,7 @@ def setup():
         else:
             return None
 
-    common_subset = common_subset.filter(
+    common = common.filter(
         lambda x: (
             x["month"] is not None
             and x["day"] is not None
@@ -63,8 +62,8 @@ def setup():
         )
     )
  
-    scientific_names = common_subset["scientificName"]
-    unique_names = sorted(set(scientific_names))
+    # scientific_names = common_subset["scientificName"]
+    # unique_names = sorted(set(scientific_names))
     name_to_idx = {name: i for i, name in enumerate(unique_names)}
  
  
@@ -82,7 +81,7 @@ def setup():
  
  
  
-    processed = common_subset.map(
+    processed = common.map(
         lambda x: {
             "encoded_input": encode_date(x["month"], x["day"]),
             "label_idx": name_to_idx[x["scientificName"]],
@@ -143,7 +142,7 @@ def setup():
         "model":               model,
         "tokenizer":           tokenizer,
         "preprocess_image":    preprocess_image,
-        "common_subset":       common_subset,
+        "common_subset":       common,
         "processed":           processed,
         "train_loader":        train_loader,
         "test_loader":         test_loader,
