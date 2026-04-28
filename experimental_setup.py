@@ -33,6 +33,8 @@ def setup():
 
     # Load the model and preprocessors
     model, preprocess_train, preprocess_val = open_clip.create_model_and_transforms('hf-hub:imageomics/bioclip-2')
+    model = model.to(device)
+
     tokenizer = open_clip.get_tokenizer('hf-hub:imageomics/bioclip-2')
 
     # Open the image from the URL
@@ -72,7 +74,7 @@ def setup():
     with torch.no_grad():
         for i in tqdm(range(0, len(unique_names), BATCH), desc="Encoding species names"):
             batch = unique_names[i : i + BATCH]
-            tokens = tokenizer(batch).to(device)
+            tokens = tokenizer(batch).to(device).long()
             embs = model.encode_text(tokens)
             embs /= embs.norm(dim=-1, keepdim=True)
             species_text_embs.append(embs.cpu())
@@ -104,7 +106,6 @@ def setup():
     counts = torch.bincount(torch.from_numpy(label_array), minlength=len(name_to_idx)).float()
     log_prior = torch.log(counts / counts.sum() + 1e-12).to(device)
  
-    # ---------------------------------------------------- test image collection
  
     test_labels         = []
     test_images         = []
