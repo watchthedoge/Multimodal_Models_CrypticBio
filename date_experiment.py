@@ -17,8 +17,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # This network is prett naive and prob can be improved
 
 class Date_to_species_Common(nn.Module):
-    """Maps 4-dim date features into one of Cryptic Bio species Scientific Name"""
-    def __init__(self, date_dim=4, output_dim=158): # 158 unique species in the common subset
+    def __init__(self, date_dim=4, output_dim=158):
         super().__init__()
         self.network = nn.Sequential(
             nn.Linear(date_dim, 64),
@@ -27,13 +26,12 @@ class Date_to_species_Common(nn.Module):
             nn.ReLU(),
             nn.Linear(128, 512),
             nn.ReLU(),
-            nn.Linear(512, output_dim),
-                
+            nn.Linear(512, output_dim)
         )
 
     def forward(self, x):
-       x=torch.flatten(x, start_dim=1)  # Flatten the input to (batch_size, date_dim)
-       return self.network(x)
+        x = torch.flatten(x, start_dim=1)  # Flatten the input to (batch_size, date_dim)
+        return self.network(x)
         
 def run():
     ctx = setup()
@@ -56,8 +54,8 @@ def run():
     
     loss   = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(network_date_to_species.parameters(), lr=1e-3)
-    
     for epoch in range(10):
+        network_date_to_species.train()
         total_loss, steps = 0.0, 0
         for batch in train_loader:
             x = batch['encoded_input'].to(device, non_blocking=True)
@@ -69,7 +67,7 @@ def run():
             optimizer.step()
             total_loss += l.item(); steps += 1
         print(f"Epoch {epoch} | train loss: {total_loss/steps:.4f}")
-        
+    # scheduler.step()
     labels = processed[:]['label_idx']  
     counts = torch.bincount(labels, minlength=len(name_to_idx)).float()
     p = counts / counts.sum()
@@ -82,10 +80,11 @@ def run():
  
     for i, img in enumerate(preprocessed_images):
         img = img.to(device)
-        with torch.no_grad(), torch.amp.autocast("cuda"):
+        with torch.no_grad(), torch.amp.autocast(device.type):
             image_features = model.encode_image(img)
             image_features /= image_features.norm(dim=-1, keepdim=True)
-            text_probs    = (100.0 * image_features @ species_text_embs_gpu.T).softmax(dim=-1)
+            logit_scale = model.logit_scale.exp()
+            text_probs    = (logit_scale * image_features @ species_text_embs_gpu.T).softmax(dim=-1)
             predicted_idx = text_probs.argmax().item()
             if predicted_idx == test_labels[i]:
                 clip_baseline_correct += 1
@@ -113,21 +112,21 @@ def run():
         img = img.to(device)
         true_label = test_labels[i]   
 
-        with torch.no_grad(), torch.amp.autocast("cuda"):
+        with torch.no_grad(), torch.amp.autocast(device.type):
             #  CLIP branch 
             image_features = model.encode_image(img)
             image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-            clip_logits = 100.0 * image_features @ species_text_embs_gpu.T     
+            clip_logits = 100 * image_features @ species_text_embs_gpu.T
             clip_log_probs = F.log_softmax(clip_logits.float(), dim=-1)        # normalize between models
 
             #  Date branch 
             date_input = preprocessed_dates[i].unsqueeze(0).to(device)
-            date_logits = network_date_to_species(date_input)                   
-            date_log_probs = F.log_softmax(date_logits, dim=-1)                
+            date_logits = network_date_to_species(date_input) 
+            date_log_probs = F.log_softmax(date_logits.float(), dim=-1)                
 
-            #  Bayesian fusion in log-space 
-            fused_log_probs = clip_log_probs + date_log_probs - log_prior
-            fused_log_probs = F.log_softmax(fused_log_probs, dim=-1)           
+            alpha = 0.7
+            fused_log_probs = (alpha * clip_log_probs) + ((1 - alpha) * date_log_probs)
+            fused_log_probs = F.log_softmax(fused_log_probs.float(), dim=-1)           
 
             clip_pred  = clip_log_probs.argmax(dim=-1).item()
             fused_pred = fused_log_probs.argmax(dim=-1).item()

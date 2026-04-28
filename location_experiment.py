@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
- 
 from experimental_setup import setup
 
 class Loc_to_species_Common(nn.Module):
@@ -39,7 +38,7 @@ def run():
     test_labels         = ctx["test_labels"]
     
     
-    network_coords_to_species = Loc_to_species_Common().to(device)
+    network_coords_to_species = Loc_to_species_Common(output_dim=len(unique_names)).to(device)
     loss=nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(network_coords_to_species.parameters(), lr=1e-3)
     for epoch in range(10):
@@ -55,7 +54,6 @@ def run():
             total_loss += l.item(); steps += 1
         print(f"Epoch {epoch} | train loss: {total_loss/steps:.4f}")
         
-    from torch.nn import functional as F
 
 
     network_coords_to_species.eval()
@@ -70,21 +68,21 @@ def run():
         img = img.to(device)
         true_label = test_labels[i] 
 
-        with torch.no_grad(), torch.amp.autocast("cuda"):
+        with torch.no_grad(), torch.amp.autocast(device.type):
             #  CLIP branch 
             image_features = model.encode_image(img)
             image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-            clip_logits = 100.0 * image_features @ species_text_embs_gpu.T     
+            clip_logits = 100 * image_features @ species_text_embs_gpu.T
             clip_log_probs = F.log_softmax(clip_logits.float(), dim=-1)        # normalize between models
 
             #  Coordinates branch 
             coord_input = coords[i].unsqueeze(0).to(device)
             coord_logits = network_coords_to_species(coord_input)                   
-            coord_log_probs = F.log_softmax(coord_logits, dim=-1)                
+            coord_log_probs = F.log_softmax(coord_logits.float(), dim=-1)                
 
-            #  Bayesian fusion in log-space 
-            fused_log_probs = clip_log_probs + coord_log_probs - log_prior
-            fused_log_probs = F.log_softmax(fused_log_probs, dim=-1)           
+            alpha = 0.5
+            fused_log_probs = (alpha * clip_log_probs) + ((1 - alpha) * coord_log_probs)    
+            fused_log_probs = F.log_softmax(fused_log_probs.float(), dim=-1)           
 
             clip_pred  = clip_log_probs.argmax(dim=-1).item()
             fused_pred = fused_log_probs.argmax(dim=-1).item()

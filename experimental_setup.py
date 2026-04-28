@@ -11,6 +11,8 @@ import numpy as np
 import open_clip
 from utils import encode_date
 from torch.utils.data import DataLoader
+import hashlib
+
 
 BATCH = 256
 CACHE_DIR = Path("image_cache")
@@ -20,13 +22,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def _url_to_filename(url: str) -> Path:
-    """Derive a safe cache filename from a URL."""
-    # Use the last path segment; fall back to a hash if it's empty/ambiguous
-    name = url.rstrip("/").split("/")[-1]
-    if not name or "." not in name:
-        import hashlib
-        name = hashlib.md5(url.encode()).hexdigest() + ".jpg"
-    return CACHE_DIR / name
+    unique_id = hashlib.md5(url.encode()).hexdigest()
+    return CACHE_DIR / f"{unique_id}.jpg"
 
 
 def open_image(url: str, retries: int = 3) -> Image.Image | None:
