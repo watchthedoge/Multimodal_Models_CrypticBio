@@ -81,7 +81,7 @@ def run():
             coord_log_probs = F.log_softmax(coord_logits.float(), dim=-1)                
 
             alpha = 0.5
-            fused_log_probs = (alpha * clip_log_probs) + ((1 - alpha) * coord_log_probs)    
+            fused_log_probs = alpha * clip_log_probs + (1 - alpha) * coord_log_probs - log_prior
             fused_log_probs = F.log_softmax(fused_log_probs.float(), dim=-1)           
 
             clip_pred  = clip_log_probs.argmax(dim=-1).item()
@@ -93,9 +93,9 @@ def run():
         fused_confidences_2.append(fused_prob)
         total += 1
 
-        print(f"Image {i}: CLIP={unique_names[clip_pred]}, "
-            f"Fused={unique_names[fused_pred]} (p={fused_prob:.3f}), "
-            f"True={unique_names[true_label]}")
+        # print(f"Image {i}: CLIP={unique_names[clip_pred]}, "
+        #     f"Fused={unique_names[fused_pred]} (p={fused_prob:.3f}), "
+        #     f"True={unique_names[true_label]}")
 
     print(f"\nCLIP-only accuracy:  {clip_correct_2/total:.3f}")
     print(f"Fused accuracy:      {fused_correct_2/total:.3f}")
