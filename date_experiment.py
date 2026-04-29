@@ -78,29 +78,29 @@ def run():
     species_text_embs_gpu = species_text_embs.to(device)
     prob_list, clip_baseline_correct = [], 0
  
-    for i, img in enumerate(preprocessed_images):
-        img = img.to(device)
-        with torch.no_grad(), torch.amp.autocast(device.type):
-            image_features = model.encode_image(img)
-            image_features /= image_features.norm(dim=-1, keepdim=True)
-            logit_scale = model.logit_scale.exp()
-            text_probs    = (logit_scale * image_features @ species_text_embs_gpu.T).softmax(dim=-1)
-            predicted_idx = text_probs.argmax().item()
-            if predicted_idx == test_labels[i]:
-                clip_baseline_correct += 1
-            prob_list.append(text_probs[0, predicted_idx].item())
-            print(
-                f"Test Image {i:04d}: pred={unique_names[predicted_idx]!r}  "
-                f"p={text_probs[0, predicted_idx].item():.4f}  "
-                f"correct={predicted_idx == test_labels[i]}"
-            )
+    # for i, img in enumerate(preprocessed_images):
+    #     img = img.to(device)
+    #     with torch.no_grad(), torch.amp.autocast(device.type):
+    #         image_features = model.encode_image(img)
+    #         image_features /= image_features.norm(dim=-1, keepdim=True)
+    #         logit_scale = model.logit_scale.exp()
+    #         text_probs    = (logit_scale * image_features @ species_text_embs_gpu.T).softmax(dim=-1)
+    #         predicted_idx = text_probs.argmax().item()
+    #         if predicted_idx == test_labels[i]:
+    #             clip_baseline_correct += 1
+    #         prob_list.append(text_probs[0, predicted_idx].item())
+    #         print(
+    #             f"Test Image {i:04d}: pred={unique_names[predicted_idx]!r}  "
+    #             f"p={text_probs[0, predicted_idx].item():.4f}  "
+    #             f"correct={predicted_idx == test_labels[i]}"
+    #         )
  
-    print(f"Avg predicted probability: {np.mean(prob_list):.4f}")
-    print(f"CLIP-only correct: {clip_baseline_correct}/{len(test_labels)}")
+    # print(f"Avg predicted probability: {np.mean(prob_list):.4f}")
+    # print(f"CLIP-only correct: {clip_baseline_correct}/{len(test_labels)}")
 
 
-    network_date_to_species.eval()
-    species_text_embs_gpu = species_text_embs.to(device)   
+    # network_date_to_species.eval()
+    # species_text_embs_gpu = species_text_embs.to(device)   
 
 
     clip_correct = 0
@@ -125,7 +125,8 @@ def run():
             date_log_probs = F.log_softmax(date_logits.float(), dim=-1)                
 
             alpha = 0.7
-            fused_log_probs = (alpha * clip_log_probs) + ((1 - alpha) * date_log_probs)
+            #added back - log_prior
+            fused_log_probs = (alpha * clip_log_probs) + ((1 - alpha) * date_log_probs) - log_prior
             fused_log_probs = F.log_softmax(fused_log_probs.float(), dim=-1)           
 
             clip_pred  = clip_log_probs.argmax(dim=-1).item()
@@ -137,9 +138,9 @@ def run():
         fused_confidences.append(fused_prob)
         total += 1
 
-        print(f"Image {i}: CLIP={unique_names[clip_pred]}, "
-            f"Fused={unique_names[fused_pred]} (p={fused_prob:.3f}), "
-            f"True={unique_names[true_label]}")
+        # print(f"Image {i}: CLIP={unique_names[clip_pred]}, "
+        #     f"Fused={unique_names[fused_pred]} (p={fused_prob:.3f}), "
+        #     f"True={unique_names[true_label]}")
 
     print(f"\nCLIP-only accuracy:  {clip_correct/total:.3f}")
     print(f"Fused accuracy:      {fused_correct/total:.3f}")
