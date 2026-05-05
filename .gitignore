@@ -1,1 +1,7 @@
 image_cache
+external/sinr/pretrained_models/   # large .pt files
+sinr_cache/                         # API call cache, machine-specific
+image_cache/                        # downloaded images, machine-specific
+__pycache__/
+*.pyc
+.venv/
