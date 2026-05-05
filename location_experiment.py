@@ -41,7 +41,7 @@ def run():
     network_coords_to_species = Loc_to_species_Common(output_dim=len(unique_names)).to(device)
     loss=nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(network_coords_to_species.parameters(), lr=1e-3)
-    for epoch in range(10):
+    for epoch in range(15):
         total_loss, steps = 0.0, 0
         for batch in train_loader:
             x = batch['coords'].to(device, non_blocking=True)
@@ -80,7 +80,7 @@ def run():
             coord_logits = network_coords_to_species(coord_input)                   
             coord_log_probs = F.log_softmax(coord_logits.float(), dim=-1)                
 
-            alpha = 0.5
+            alpha = 0.25
             fused_log_probs = alpha * clip_log_probs + (1 - alpha) * coord_log_probs - log_prior
             fused_log_probs = F.log_softmax(fused_log_probs.float(), dim=-1)           
 

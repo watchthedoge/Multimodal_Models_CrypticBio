@@ -10,13 +10,23 @@ import torch
 import numpy as np
 import open_clip
 from utils import encode_date
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
+from sklearn.model_selection import GroupShuffleSplit
 import hashlib
 
 
 BATCH = 256
 CACHE_DIR = Path("image_cache")
 CACHE_DIR.mkdir(exist_ok=True)
+
+# Group-split config -- same test_size/seed as the original row-level split
+# so the only change is grouping. Coordinates are rounded to GROUP_PRECISION
+# decimal places to define a "location group"; all rows sharing a (lat, lon)
+# bucket go entirely to train or entirely to test, preventing leakage from
+# multi-photo observations at the same location.
+GROUP_TEST_SIZE = 0.21
+GROUP_SEED = 42
+GROUP_PRECISION = 4  # ~11 m at the equator; matches "same observation site"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -75,6 +85,42 @@ def _prefetch_urls(urls: list[str], max_workers: int = 4) -> None:
         futures = {ex.submit(_fetch, u): u for u in todo}
         for _ in tqdm(as_completed(futures), total=len(todo), desc="Downloading"):
             pass
+def _group_split_indices(processed):
+    """
+    Build train/test indices using GroupShuffleSplit on rounded (lat, lon).
+    All rows sharing a location bucket go to the same side of the split.
+    Returns (train_idx, test_idx) as Python lists.
+    """
+    coords_list = processed["coords"]
+
+    groups_tuples = [
+        (round(float(c[0]), GROUP_PRECISION), round(float(c[1]), GROUP_PRECISION))
+        for c in coords_list
+    ]
+    key_to_id = {}
+    group_ids = np.empty(len(groups_tuples), dtype=np.int64)
+    for i, key in enumerate(groups_tuples):
+        if key not in key_to_id:
+            key_to_id[key] = len(key_to_id)
+        group_ids[i] = key_to_id[key]
+
+    n = len(group_ids)
+    n_unique = len(key_to_id)
+    print(f"Group-aware split: {n_unique} unique locations across {n} rows "
+          f"({100 * n_unique / n:.1f}% unique).")
+
+    gss = GroupShuffleSplit(n_splits=1, test_size=GROUP_TEST_SIZE, random_state=GROUP_SEED)
+    train_idx, test_idx = next(gss.split(np.zeros((n, 1)), groups=group_ids))
+
+    # Sanity check: no group should appear in both splits.
+    train_groups = set(group_ids[train_idx].tolist())
+    test_groups  = set(group_ids[test_idx].tolist())
+    overlap = train_groups & test_groups
+    assert not overlap, f"Group leak between splits: {len(overlap)} shared groups"
+    print(f"Train: {len(train_idx)} rows, {len(train_groups)} locations | "
+          f"Test: {len(test_idx)} rows, {len(test_groups)} locations")
+
+    return train_idx.tolist(), test_idx.tolist()
 
 
 def setup():
@@ -128,8 +174,13 @@ def setup():
 
     processed.set_format(type="torch", columns=["encoded_input", "label_idx", "url", "coords"])
 
-    split = processed.train_test_split(test_size=0.21, seed=42)
-    train_ds, test_ds = split["train"], split["test"]
+
+    #split = processed.train_test_split(test_size=0.21, seed=42)
+    #train_ds, test_ds = split["train"], split["test"]
+    # Group-aware split (replaces processed.train_test_split) 
+    train_idx, test_idx = _group_split_indices(processed)
+    train_ds = processed.select(train_idx)
+    test_ds  = processed.select(test_idx)
 
     train_loader = DataLoader(train_ds, batch_size=2048, shuffle=True,  num_workers=2, pin_memory=True)
     test_loader  = DataLoader(test_ds,  batch_size=2048, shuffle=False, num_workers=2, pin_memory=True)

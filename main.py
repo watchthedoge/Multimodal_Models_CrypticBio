@@ -20,9 +20,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--e',
         nargs='?',
-        choices=['location', 'date', 'both'],
+        choices=['location', 'date', 'both','sinr','sinr_ft'],
         required=True,
-        help='choose from "location", "date", or "both"'
+        help='choose from "location", "date", sinr. "sinr_ft" or "both"'
     )
 
     args = parser.parse_args()
@@ -34,3 +34,6 @@ if __name__ == "__main__":
     elif args.e == "both":
         run_date()
         run_location()
+    elif args.e == "sinr":
+        import sinr_location_experiment
+        sinr_location_experiment.run_sweep()
