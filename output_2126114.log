@@ -1,0 +1,17 @@
+Pre-fetching 3 images with 4 workers…
+Error downloading image: 404 Client Error: Not Found for url: https://observation.org/photos/47599946.jpg
+Error downloading image: 404 Client Error: Not Found for url: https://inaturalist-open-data.s3.amazonaws.com/photos/426449424/original.jpeg
+Error downloading image: 404 Client Error: Not Found for url: https://inaturalist-open-data.s3.amazonaws.com/photos/207457311/original.jpg
+Error downloading image: 404 Client Error: Not Found for url: https://inaturalist-open-data.s3.amazonaws.com/photos/207457311/original.jpg
+Error downloading image: 404 Client Error: Not Found for url: https://observation.org/photos/47599946.jpg
+Error downloading image: 404 Client Error: Not Found for url: https://inaturalist-open-data.s3.amazonaws.com/photos/426449424/original.jpeg
+Collected 1000 test images, failed 3
+Epoch 0 | train loss: 5.0569
+Epoch 1 | train loss: 5.0260
+Epoch 2 | train loss: 4.9710
+Epoch 3 | train loss: 4.8935
+Epoch 4 | train loss: 4.8488
+Epoch 5 | train loss: 4.8080
+Epoch 6 | train loss: 4.8031
+Epoch 7 | train loss: 4.7979
+Epoch 8 | train loss: 4.7857

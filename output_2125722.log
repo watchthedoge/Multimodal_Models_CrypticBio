@@ -1,0 +1,8 @@
+Pre-fetching 97 images with 4 workers…
+Error downloading image: 404 Client Error: Not Found for url: https://observation.org/photos/47599946.jpg
+Error downloading image: 404 Client Error: Not Found for url: https://inaturalist-open-data.s3.amazonaws.com/photos/426449424/original.jpeg
+Error downloading image: 404 Client Error: Not Found for url: https://inaturalist-open-data.s3.amazonaws.com/photos/207457311/original.jpg
+Error downloading image: 404 Client Error: Not Found for url: https://inaturalist-open-data.s3.amazonaws.com/photos/207457311/original.jpg
+Error downloading image: 404 Client Error: Not Found for url: https://observation.org/photos/47599946.jpg
+Error downloading image: 404 Client Error: Not Found for url: https://inaturalist-open-data.s3.amazonaws.com/photos/426449424/original.jpeg
+Collected 1000 test images, failed 3
