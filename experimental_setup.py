@@ -1,6 +1,7 @@
 from tqdm import tqdm
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
 
 from dataset_loader import retrieve_dataset
 import requests
@@ -26,7 +27,7 @@ def _url_to_filename(url: str) -> Path:
     return CACHE_DIR / f"{unique_id}.jpg"
 
 
-def open_image(url: str, retries: int = 3) -> Image.Image | None:
+def open_image(url: str, retries: int = 3) -> "Optional[Image.Image]":
     """Return a PIL image, using a local cache to avoid re-downloading.
     Retries on 429 with exponential backoff."""
     import time
@@ -87,7 +88,7 @@ def setup():
     model = model.to(device)
     tokenizer = open_clip.get_tokenizer('hf-hub:imageomics/bioclip-2')
 
-    def preprocess_image(sample: dict) -> torch.Tensor | None:
+    def preprocess_image(sample: dict) -> "Optional[torch.Tensor]":
         img = open_image(sample["url"])
         if img is not None:
             return preprocess_val(img).unsqueeze(0)
