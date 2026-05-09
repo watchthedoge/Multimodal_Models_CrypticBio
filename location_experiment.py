@@ -23,9 +23,9 @@ class Loc_to_species_Common(nn.Module):
     def forward(self, x):
        x=torch.flatten(x, start_dim=1)  # Flatten the input to (batch_size, coord_dim)
        return self.network(x)
-        
-def run():
-    ctx = setup()
+    
+def run(benchmark="common"):
+    ctx = setup(benchmark=benchmark)
  
     device              = ctx["device"]
     model               = ctx["model"]

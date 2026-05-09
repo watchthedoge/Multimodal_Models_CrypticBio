@@ -9,7 +9,7 @@ from io import BytesIO
 import torch
 import numpy as np
 import open_clip
-from utils import encode_date
+from utils import encode_date, set_seed, seed_worker
 from torch.utils.data import DataLoader, Subset
 from sklearn.model_selection import GroupShuffleSplit
 import hashlib
@@ -18,15 +18,10 @@ import hashlib
 BATCH = 256
 CACHE_DIR = Path("image_cache")
 CACHE_DIR.mkdir(exist_ok=True)
-
-# Group-split config -- same test_size/seed as the original row-level split
-# so the only change is grouping. Coordinates are rounded to GROUP_PRECISION
-# decimal places to define a "location group"; all rows sharing a (lat, lon)
-# bucket go entirely to train or entirely to test, preventing leakage from
-# multi-photo observations at the same location.
+# Variables for the propper splitting of locations in the train/test 
 GROUP_TEST_SIZE = 0.21
 GROUP_SEED = 42
-GROUP_PRECISION = 4  # ~11 m at the equator; matches "same observation site"
+GROUP_PRECISION = 4  # ~11 m at the equator, "same observation site"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -123,10 +118,13 @@ def _group_split_indices(processed):
     return train_idx.tolist(), test_idx.tolist()
 
 
-def setup():
-    # loading files
-    common = retrieve_dataset(file="common")
+def setup(benchmark="common", seed=42):
+
+    set_seed(seed)
+
+    common = retrieve_dataset(file=benchmark)
     unique_names = sorted(set(common["scientificName"]))
+    print(f"Benchmark: {benchmark} | {len(unique_names)} unique species")
 
     # Load the model and preprocessors
     model, preprocess_train, preprocess_val = open_clip.create_model_and_transforms('hf-hub:imageomics/bioclip-2')
@@ -182,21 +180,25 @@ def setup():
     train_ds = processed.select(train_idx)
     test_ds  = processed.select(test_idx)
 
-    train_loader = DataLoader(train_ds, batch_size=2048, shuffle=True,  num_workers=2, pin_memory=True)
-    test_loader  = DataLoader(test_ds,  batch_size=2048, shuffle=False, num_workers=2, pin_memory=True)
+    # Seeded generator + worker_init_fn so train shuffle order is reproducible.
+    loader_generator = torch.Generator()
+    loader_generator.manual_seed(seed)
+    train_loader = DataLoader(
+        train_ds, batch_size=2048, shuffle=True, num_workers=2, pin_memory=True,
+        generator=loader_generator, worker_init_fn=seed_worker,
+    )
+    test_loader  = DataLoader(
+        test_ds,  batch_size=2048, shuffle=False, num_workers=2, pin_memory=True,
+        worker_init_fn=seed_worker,
+    )
 
-    # Pre-compute log-prior over species from the full processed set
-    label_array = np.array(processed["label_idx"], dtype=np.int64)
-    counts = torch.bincount(torch.from_numpy(label_array), minlength=len(name_to_idx)).float()
-    log_prior = torch.log(counts / counts.sum() + 1e-12).to(device)
-
-    target = 1000
+  # Pre-compute log-prior over species from the TRAIN set only 
+    train_label_array = np.array(train_ds["label_idx"], dtype=np.int64)
+    counts = torch.bincount(torch.from_numpy(train_label_array), minlength=len(name_to_idx)).float() + 1.0
+    log_prior = torch.log(counts / counts.sum()).to(device)
     all_test_urls = []
     for batch in test_loader:
         all_test_urls.extend(batch["url"])
-        if len(all_test_urls) >= target:
-            break
-    all_test_urls = all_test_urls[:target]
     _prefetch_urls(all_test_urls)
 
     # ---- build test collections from cache ----
@@ -208,11 +210,7 @@ def setup():
     failed              = 0
 
     for batch in test_loader:
-        if len(preprocessed_images) >= target:
-            break
         for i in range(len(batch["url"])):
-            if len(preprocessed_images) >= target:
-                break
             url = batch["url"][i]
             try:
                 img = preprocess_image({"url": url})

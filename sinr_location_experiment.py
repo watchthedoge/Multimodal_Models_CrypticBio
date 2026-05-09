@@ -7,28 +7,6 @@
 # Full Bayesian factoring:
 #     log P(class | image, loc) = log P(class|image) + log P(loc|class)
 #                                  - log P(class) + C
-#
-# In code:
-#     fused = clip_log_softmax + alpha * (sinr_log_prior - sinr_background) - log_prior
-#     pred  = log_softmax(fused)
-#
-# CALIBRATION (the key fix vs. naive log(sigmoid) fusion)
-# -------------------------------------------------------
-# Naive zero-shot SINR fusion fails because SINR's sigmoid outputs encode
-# both "is this species likely HERE" and "is this species globally common".
-# A globally common species gets a higher absolute sigmoid value almost
-# everywhere than a globally rarer species, even at equally suitable
-# locations. That global-frequency bias leaks into the argmax.
-#
-# Fix: per-species background calibration. For each species, compute its
-# MEAN log-prior across a sample of random global locations -- the
-# "expected log-presence anywhere." Subtract this from the per-sample
-# log-prior. The result is a location-relative score:
-#   - >0  : species is more present here than typical
-#   - <0  : species is less present here than typical
-#   - ~0  : indifferent
-# This removes the global-frequency offset cleanly.
-#
 # IMPORT STRATEGY
 # ---------------
 # Load SINR's modules via importlib from explicit paths to avoid
@@ -126,9 +104,6 @@ def compute_sinr_background(sinr_model, coord_encoder, sinr_idx_t, covered_t,
             n_done += batch_lon_lat.shape[0]
 
     background = accumulator / n_done                               # (158,)
-
-    # Uncovered species: set background to 0 so calibrated values also
-    # end up 0 (neutral -- doesn't favor or penalize them).
     background = torch.where(covered_t, background, torch.zeros_like(background))
     return background
 
@@ -208,16 +183,24 @@ def _score(clip_log_probs, sinr_log_cal, log_prior, alpha, test_labels, covered)
 
 # --- Public entry points ----------------------------------------------------
 
-def run(alpha=1.0):
-    return run_sweep(alphas=[alpha])
+def run(alpha=1.0, benchmark="common"):
+    return run_sweep(alphas=[alpha], benchmark=benchmark)
 
 
-def run_sweep(alphas=(0.0, 5.0, 10.0, 20.0, 25.0, 30.0, 50.0),
-              n_background=10000):
+def run_sweep(alphas=(0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0),
+              n_background=10000,
+              benchmark="common"):
     """
     Free alpha sweep with calibrated SINR. alpha=0 reproduces CLIP-only.
+
+    SINR's calibrated log-sigmoid output lives on a different scale from
+    CLIP's log-softmax (the former is unbounded log-density, the latter is
+    bounded by log(1/N)). Before fusion we rescale `sinr_log_cal` by the
+    ratio std(clip)/std(sinr) so both branches contribute matched variance.
+    After this rescaling, alpha is a unitless mixing weight: alpha=1 means
+    SINR contributes the same spread as CLIP, alpha=0 disables SINR.
     """
-    ctx = setup()
+    ctx = setup(benchmark=benchmark)
     device = ctx["device"]
     log_prior = ctx["log_prior"].to(device)
 
@@ -244,8 +227,21 @@ def run_sweep(alphas=(0.0, 5.0, 10.0, 20.0, 25.0, 30.0, 50.0),
         ctx, sinr_model, coord_encoder, sinr_idx_t, covered_t, background, device,
     )
 
+    # Match SINR's variance to CLIP's so alpha becomes a unitless mixing
+    # weight. Restrict the std calc to covered species (uncovered entries
+    # are zero-filled by design and would deflate sinr's std).
+    clip_std = clip_log_probs.std()
+    sinr_std = sinr_log_cal[:, covered_t].std()
+    scale = (clip_std / sinr_std.clamp(min=1e-8)).item()
+    print(f"SINR rescale factor (std-match to CLIP): {scale:.4f}  "
+          f"[clip_std={clip_std.item():.4f}, sinr_std={sinr_std.item():.4f}]")
+    sinr_log_cal = sinr_log_cal * scale
+
+    n_total_classes = len(ctx["unique_names"])
+    n_covered_classes = int(sum(covered))
     print()
-    print(f"{'alpha':>8} | {'acc (all 158)':>14} | {'acc (covered 153)':>18}")
+    print(f"{'alpha':>8} | {'acc (all ' + str(n_total_classes) + ')':>14} | "
+          f"{'acc (covered ' + str(n_covered_classes) + ')':>18}")
     print("-" * 50)
     results = []
     for a in alphas:

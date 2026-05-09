@@ -33,8 +33,8 @@ class Date_to_species_Common(nn.Module):
         x = torch.flatten(x, start_dim=1)  # Flatten the input to (batch_size, date_dim)
         return self.network(x)
         
-def run():
-    ctx = setup()
+def run(benchmark="common"):
+    ctx = setup(benchmark=benchmark)
  
     device              = ctx["device"]
     model               = ctx["model"]

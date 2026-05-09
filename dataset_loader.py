@@ -1,12 +1,17 @@
 from datasets import load_dataset
 import numpy as np
 from collections import Counter
-
 def retrieve_dataset(file):
     if file == "common":
         ds = load_dataset("gmanolache/CrypticBio", data_files="CrypticBio-Benchmark/CrypticBio-Common.csv", split="train")
+    elif file == "common_unseen":
+        ds = load_dataset("gmanolache/CrypticBio", data_files="CrypticBio-Benchmark/CrypticBio-CommonUnseen.csv", split="train")
+    elif file == "endangered":
+        ds = load_dataset("gmanolache/CrypticBio", data_files="CrypticBio-Benchmark/CrypticBio-Endagered.csv", split="train")
     elif file == "full":
         ds = load_dataset("gmanolache/CrypticBio", split="train")
+    else:
+        raise ValueError(f"Unknown benchmark '{file}'. Expected one of: common, common_unseen, endangered, full.")
 
     return ds
 
