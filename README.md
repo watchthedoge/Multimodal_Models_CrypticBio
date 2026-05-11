@@ -28,3 +28,10 @@ To run the SINR experiment, follow these steps:
 * Then, run the experiment using: ``python sinr_location_experiment.py``
 
 All environmental details are found in the ``requirements.txt`` file.
+
+To run statistics on the common dataset, follow these steps:
+
+* Follow the first three steps from the first instructions
+* Move into the folder ``‎statistics``
+* Run the Jupyter notebook file as  ``jupyter nbconvert --to notebook --inplace --execute statistics.ipynb``
+* 2 output files will be created in a new folder ``output``, all other plots are visable in the Jupyter notebook file ``statistics.ipynb``. 
