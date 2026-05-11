@@ -18,7 +18,11 @@ To run the SINR experiment, follow these steps:
 
 * Follow the first three steps from previous instructions
 * Switch to the SINR branch: ``git checkout Extra_experimetn``
-* To create the needed file structure for
+* To create the needed file structure for SINR:
+* Create the needed folders: ``mkdir -p external/sinr``
+* Clone the SINR GitHub: ``git clone https://github.com/elijahcole/sinr.git external/sinr``
+* Download the pre-trained model file: ``wget "https://data.caltech.edu/records/dk5g7-rhq64/files/pretrained_models.zip?download=1" -O pretrained_models.zip``
+* Unzip the file: ``unzip pretrained_models.zip -d external/sinr/``
 
 
 Include:
