@@ -59,27 +59,32 @@ def run_experiment(experiment, level):
     test_images         = ctx["test_images"]
 
     # Build label space
-    unique_labels = sorted(set(common_subset[level]))
+    unique_labels = sorted(set(common_subset[level]), key=lambda x: (x is None, x))    
     label_to_idx  = {lbl: i for i, lbl in enumerate(unique_labels)}
+    print(f"None in label_to_idx: {None in label_to_idx}")
+    print(f"Sample values: {list(label_to_idx.keys())[:10]}")
     print(f"\nLevel: {level!r} — {len(unique_labels)} unique labels")
 
+    if level == "order" and None in label_to_idx:
+        idx = label_to_idx.pop(None)
+        label_to_idx["Squamata"] = idx
+        unique_labels[idx] = "Squamata"    
     # Always use species-level embedding
     species_text_embs = ctx["species_text_embs"].to(device)
     unique_species    = ctx["unique_names"]
 
     # find which taxon index it belongs to at the chosen level
-    species_taxon_map = {row["scientificName"]: label_to_idx[row[level]] for row in common_subset}
+    species_taxon_map = {row["scientificName"]: label_to_idx["Squamata" if row[level] is None else row[level]] for row in common_subset}
     species_to_taxon  = torch.tensor(
         [species_taxon_map[sp] for sp in unique_species], dtype=torch.long
     ).to(device)
 
-    taxon_indices = [label_to_idx[lbl] for lbl in common_subset[level]]
+    taxon_indices = [label_to_idx["Squamata" if lbl is None else lbl] for lbl in common_subset[level]]
     counts    = torch.bincount(torch.tensor(taxon_indices, dtype=torch.long), minlength=len(label_to_idx)).float()
     log_prior = torch.log(counts / counts.sum() + 1e-12).to(device)
 
     # Remap to the taxonomy level
-    url_to_taxon = {common_subset[i]["url"]: label_to_idx[common_subset[level][i]] for i in range(len(common_subset))}
-
+    url_to_taxon = {common_subset[i]["url"]: label_to_idx["Squamata" if common_subset[level][i] is None else common_subset[level][i]] for i in range(len(common_subset))}
     remapped = processed.map(lambda x: {"label_idx": url_to_taxon[x["url"]]})
     remapped.set_format(type="torch", columns=["encoded_input", "label_idx", "coords"])
     train_loader = DataLoader(remapped, batch_size=2048, shuffle=True, num_workers=2, pin_memory=True)
