@@ -114,7 +114,7 @@ def run_experiment(experiment, level):
                 image_features = model.encode_image(img)
                 image_features = image_features / image_features.norm(dim=-1, keepdim=True)
                 #score at species level, then sum probs per taxon group
-                species_probs = F.softmax(100 * image_features @ species_text_embs.T, dim=-1)
+                species_probs = F.softmax(100 * image_features @ species_text_embs.T, dim=-1).float()
                 clip_probs    = torch.zeros(1, len(unique_labels), device=device).scatter_add_(
                     1, species_to_taxon.unsqueeze(0), species_probs
                 )
@@ -164,7 +164,7 @@ def run_experiment(experiment, level):
                 image_features = model.encode_image(img)
                 image_features = image_features / image_features.norm(dim=-1, keepdim=True)
                 # score at species level, then sum probs per taxon group
-                species_probs = F.softmax(100 * image_features @ species_text_embs.T, dim=-1)
+                species_probs = F.softmax(100 * image_features @ species_text_embs.T, dim=-1).float()
                 clip_probs    = torch.zeros(1, len(unique_labels), device=device).scatter_add_(
                     1, species_to_taxon.unsqueeze(0), species_probs
                 )
