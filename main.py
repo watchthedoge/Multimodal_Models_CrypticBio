@@ -19,9 +19,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--e',
         nargs='?',
-        choices=['location', 'date', 'both', 'sinr', 'sinr_ft'],
+        choices=['location', 'date', 'both', 'sinr'],
         required=True,
-        help='choose from "location", "date", sinr. "sinr_ft" or "both"'
+        help='choose from "location", "date", sinr or "both"'
     )
     parser.add_argument(
         '--benchmark',
