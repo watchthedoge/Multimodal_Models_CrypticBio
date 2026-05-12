@@ -6,9 +6,9 @@ The CrypticBio Common dataset was accessed through the Hugging Face Datasets lib
 
 Python version: ``3.11.15``
 
-To run the experiments, two branches are required.
+## To run the experiments, two branches are required.
 
-To run the taxonomy and modality experiments, follow these steps:
+### To run the taxonomy and modality experiments, follow these steps:
 
 * Clone/download the repository
 * Create an environment
@@ -16,7 +16,7 @@ To run the taxonomy and modality experiments, follow these steps:
 * To run the taxonomy and modality experiments, use: ``python taxonomy_experiment.py --e ["location", "date", "both"] --level ["kingdom", "phylum", "class", "order", "family", "genus", "scientificName"]``
 * This experiment will train the MLP network on date or location data, and evaluate the test set with both BioCLIP-2 and the fused model.
 
-To run the SINR experiment, navigate to the ``Extra_experimetn`` branch and after installing requirements.txt:
+### To run the SINR experiment, navigate to the ``Extra_experimetn`` branch and after installing requirements.txt:
 
 
 ```bash
@@ -24,24 +24,28 @@ To run the SINR experiment, navigate to the ``Extra_experimetn`` branch and afte
 mkdir -p external && cd external
 git clone https://github.com/elijahcole/sinr.git
 cd sinr && mkdir -p pretrained_models
-# Download model_an_full_input_enc_sin_cos_distilled_from_env.pt
-#Linux
+```
+Now to download model_an_full_input_enc_sin_cos_distilled_from_env.pt
+For linux Linux
+```bash
 wget "https://data.caltech.edu/records/dk5g7-rhq64/files/pretrained_models.zip?download=1" -O pretrained_models.zip
 unzip -j pretrained_models.zip "pretrained_models/model_an_full_input_enc_sin_cos_distilled_from_env.pt" -d pretrained_models/
 rm pretrained_models.zip
-#Or windows(tested)
+```
+Or windows(tested)
+```bash
 curl -L -o pretrained_models.zip "https://data.caltech.edu/records/dk5g7-rhq64/files/pretrained_models.zip?download=1"
 tar -xf pretrained_models.zip pretrained_models/model_an_full_input_enc_sin_cos_distilled_from_env.pt
 del pretrained_models.zip
 ```
-Navigate back to root. And now you are able to run all experiments!
+Navigate back to root. And now you are able to run all experiments! Make sure to run with CUDA enabled!
 Example usage: 
 ```bash
 python main.py --e sinr --benchmark common
 ```
 
 For more functionalities, refer to the local README.md
-
+## Additional notes
 All environmental details are found in the ``requirements.txt`` file.
 
 To run statistics on the common dataset, follow these steps:
