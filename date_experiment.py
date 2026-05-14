@@ -13,9 +13,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # We kinda mimic the first stage of the BioClip training - learing meaningful represemntation of date
 
 
-
-# This network is prett naive and prob can be improved
-
 class Date_to_species_Common(nn.Module):
     def __init__(self, date_dim=4, output_dim=158):
         super().__init__()
@@ -33,6 +30,7 @@ class Date_to_species_Common(nn.Module):
         x = torch.flatten(x, start_dim=1)  # Flatten the input to (batch_size, date_dim)
         return self.network(x)
         
+# The main training loop
 def run():
     ctx = setup()
  
@@ -54,6 +52,7 @@ def run():
     
     loss   = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(network_date_to_species.parameters(), lr=1e-3)
+    
     for epoch in range(10):
         network_date_to_species.train()
         total_loss, steps = 0.0, 0
@@ -67,6 +66,7 @@ def run():
             optimizer.step()
             total_loss += l.item(); steps += 1
         print(f"Epoch {epoch} | train loss: {total_loss/steps:.4f}")
+
     # scheduler.step()
     labels = processed[:]['label_idx']  
     counts = torch.bincount(labels, minlength=len(name_to_idx)).float()
@@ -108,6 +108,8 @@ def run():
     fused_confidences = []
     total = 0
 
+    # Fuse CLIP + date predictions in log-space (subtract log_prior to debias class frequencies).
+    # Track both CLIP-only and fused accuracy.
     for i, img in enumerate(preprocessed_images):
         img = img.to(device)
         true_label = test_labels[i]   
@@ -125,7 +127,6 @@ def run():
             date_log_probs = F.log_softmax(date_logits.float(), dim=-1)                
 
             alpha = 0.7
-            #added back - log_prior
             fused_log_probs = (alpha * clip_log_probs) + ((1 - alpha) * date_log_probs) - log_prior
             fused_log_probs = F.log_softmax(fused_log_probs.float(), dim=-1)           
 

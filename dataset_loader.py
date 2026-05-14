@@ -2,6 +2,7 @@ from datasets import load_dataset
 import numpy as np
 from collections import Counter
 
+# loads the CrypticBio dataset, either the "common" subset or the full dataset
 def retrieve_dataset(file):
     if file == "common":
         ds = load_dataset("gmanolache/CrypticBio", data_files="CrypticBio-Benchmark/CrypticBio-Common.csv", split="train")
@@ -9,6 +10,7 @@ def retrieve_dataset(file):
         ds = load_dataset("gmanolache/CrypticBio", split="train")
 
     return ds
+
 
 def dataset_overview(ds):
     print("\n=== DATASET OVERVIEW ===")

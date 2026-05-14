@@ -10,7 +10,6 @@ TAXONOMY_LEVELS = ["kingdom", "phylum", "class", "order", "family", "genus", "sc
 
 BATCH = 256
 
-
 class DateToTaxon(nn.Module):
     def __init__(self, date_dim=4, output_dim=158):
         super().__init__()
@@ -65,11 +64,13 @@ def run_experiment(experiment, level):
     print(f"Sample values: {list(label_to_idx.keys())[:10]}")
     print(f"\nLevel: {level!r} — {len(unique_labels)} unique labels")
 
+    # One reptile species in CrypticBio-Common has no `order` value. Squamata is its correct order
     if level == "order" and None in label_to_idx:
         idx = label_to_idx.pop(None)
         label_to_idx["Squamata"] = idx
-        unique_labels[idx] = "Squamata"    
-    # Always use species-level embedding
+        unique_labels[idx] = "Squamata"
+
+    # BioCLIP only has species-level text embeddings. We use scatter_add_ to aggregate them to the target taxon level
     species_text_embs = ctx["species_text_embs"].to(device)
     unique_species    = ctx["unique_names"]
 
@@ -91,6 +92,7 @@ def run_experiment(experiment, level):
 
     test_labels = [url_to_taxon[url] for url in test_images]
 
+    # Run the chosen experiment(s)
     if experiment in ("date", "both"):
         network   = DateToTaxon(output_dim=len(unique_labels)).to(device)
         optimizer = torch.optim.Adam(network.parameters(), lr=1e-3)
@@ -141,6 +143,8 @@ def run_experiment(experiment, level):
         print(f"Fused accuracy:       {fused_correct / len(test_labels):.3f}")
         print(f"Avg fused confidence: {np.mean(fused_confidences):.4f}")
 
+
+    # Run the chosen experiment(s)
     if experiment in ("location", "both"):
         network   = LocToTaxon(output_dim=len(unique_labels)).to(device)
         optimizer = torch.optim.Adam(network.parameters(), lr=1e-3)
@@ -177,6 +181,7 @@ def run_experiment(experiment, level):
 
                 coord_log_probs = F.log_softmax(network(coords[i].unsqueeze(0).to(device)), dim=-1)
 
+                # alpha=0.5 gives equal weight 
                 alpha = 0.5
                 fused_log_probs = F.log_softmax(alpha * clip_log_probs + (1 - alpha) * coord_log_probs - log_prior, dim=-1)
 

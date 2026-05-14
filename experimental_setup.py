@@ -14,14 +14,13 @@ from utils import encode_date
 from torch.utils.data import DataLoader
 import hashlib
 
-
 BATCH = 256
 CACHE_DIR = Path("image_cache")
 CACHE_DIR.mkdir(exist_ok=True)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
+# store downloaded images
 def _url_to_filename(url: str) -> Path:
     unique_id = hashlib.md5(url.encode()).hexdigest()
     return CACHE_DIR / f"{unique_id}.jpg"
@@ -83,17 +82,19 @@ def setup():
     common = retrieve_dataset(file="common")
     unique_names = sorted(set(common["scientificName"]))
 
-    # Load the model and preprocessors
+    # load the model and preprocessors
     model, preprocess_train, preprocess_val = open_clip.create_model_and_transforms('hf-hub:imageomics/bioclip-2')
     model = model.to(device)
     tokenizer = open_clip.get_tokenizer('hf-hub:imageomics/bioclip-2')
 
+    # helper function to download and preprocess images on-the-fly.
     def preprocess_image(sample: dict) -> "Optional[torch.Tensor]":
         img = open_image(sample["url"])
         if img is not None:
             return preprocess_val(img).unsqueeze(0)
         return None
 
+    # only include entries that have valid month, day, latitude, and longitude values
     common = common.filter(
         lambda x: (
             x["month"] is not None
@@ -105,7 +106,7 @@ def setup():
 
     name_to_idx = {name: i for i, name in enumerate(unique_names)}
 
-    # Encode every species name with BioCLIP's text encoder
+    # encode every species name with BioCLIP's text encoder
     species_text_embs = []
     with torch.no_grad():
         for i in tqdm(range(0, len(unique_names), BATCH), desc="Encoding species names"):
@@ -117,6 +118,7 @@ def setup():
 
     species_text_embs = torch.cat(species_text_embs, dim=0)
 
+    # encode dates 
     processed = common.map(
         lambda x: {
             "encoded_input": encode_date(x["month"], x["day"]),
@@ -138,7 +140,7 @@ def setup():
     # Pre-compute log-prior over species from the full processed set
     label_array = np.array(processed["label_idx"], dtype=np.int64)
     counts = torch.bincount(torch.from_numpy(label_array), minlength=len(name_to_idx)).float()
-    log_prior = torch.log(counts / counts.sum() + 1e-12).to(device)
+    log_prior = torch.log(counts / counts.sum() + 1e-12).to(device)  # 1e-12 prevents log(0) for unseen classes
 
     target = 1000
     all_test_urls = []
@@ -149,7 +151,7 @@ def setup():
     all_test_urls = all_test_urls[:target]
     _prefetch_urls(all_test_urls)
 
-    # ---- build test collections from cache ----
+    # build test collections from cache
     test_labels         = []
     test_images         = []
     preprocessed_images = []

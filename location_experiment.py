@@ -16,14 +16,14 @@ class Loc_to_species_Common(nn.Module):
             nn.ReLU(),
             nn.Linear(128, 256),
             nn.ReLU(),
-            nn.Linear(256, output_dim),
-                
+            nn.Linear(256, output_dim),    
         )
 
     def forward(self, x):
        x=torch.flatten(x, start_dim=1)  # Flatten the input to (batch_size, coord_dim)
        return self.network(x)
         
+# The main training loop for the location-based experiment
 def run():
     ctx = setup()
  
@@ -55,7 +55,6 @@ def run():
         print(f"Epoch {epoch} | train loss: {total_loss/steps:.4f}")
         
 
-
     network_coords_to_species.eval()
     species_text_embs_gpu = species_text_embs.to(device)   
 
@@ -64,6 +63,7 @@ def run():
     fused_confidences_2 = []
     total = 0
 
+    # Fuse CLIP and location predictions via weighted log-prob average.
     for i, img in enumerate(preprocessed_images):
         img = img.to(device)
         true_label = test_labels[i] 
@@ -80,7 +80,7 @@ def run():
             coord_logits = network_coords_to_species(coord_input)                   
             coord_log_probs = F.log_softmax(coord_logits.float(), dim=-1)                
 
-            alpha = 0.5
+            alpha = 0.5  # location signal is stronger than date so 0.5 beats date_experiment's 0.7
             fused_log_probs = alpha * clip_log_probs + (1 - alpha) * coord_log_probs - log_prior
             fused_log_probs = F.log_softmax(fused_log_probs.float(), dim=-1)           
 
